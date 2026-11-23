@@ -39,7 +39,7 @@ describe('tool policy', () => {
 
   it('reads the policy from env', () => {
     expect(toolPolicyFromEnv({})).toEqual({
-      readOnly: false,
+      readOnly: true,
       allowDelete: false,
       maxResponseChars: undefined,
     });
@@ -51,6 +51,13 @@ describe('tool policy', () => {
       }),
     ).toEqual({ readOnly: true, allowDelete: true, maxResponseChars: 5000 });
     expect(toolPolicyFromEnv({ CONTA_READ_ONLY: 'false' }).readOnly).toBe(false);
+    expect(toolPolicyFromEnv({ CONTA_READ_ONLY: 'nei' }).readOnly).toBe(false);
+    expect(toolPolicyFromEnv({ CONTA_READ_ONLY: '' }).readOnly).toBe(true);
+  });
+
+  it('refuses an unrecognised flag value instead of picking a mode', () => {
+    expect(() => toolPolicyFromEnv({ CONTA_READ_ONLY: 'on' })).toThrow(/CONTA_READ_ONLY/);
+    expect(() => toolPolicyFromEnv({ CONTA_ALLOW_DELETE: 'treu' })).toThrow(/CONTA_ALLOW_DELETE/);
   });
 
   it('rejects a nonsensical CONTA_MAX_RESPONSE_CHARS', () => {
@@ -182,6 +189,18 @@ describe('request timeout', () => {
       },
     });
     await expect(client.get('/invoice/ping')).rejects.toThrow(/timed out after 5 ms/);
+  });
+
+  it('warns that a timed-out write may have been carried out, but not on reads', async () => {
+    const client = new ContaClient({
+      apiKey: 'k',
+      timeoutMs: 5,
+      fetch: async () => {
+        throw new DOMException('The operation timed out.', 'TimeoutError');
+      },
+    });
+    await expect(client.post('/invoices', {})).rejects.toThrow(/may still have been carried out/);
+    await expect(client.get('/invoice/ping')).rejects.not.toThrow(/carried out/);
   });
 
   it('rejects a non-positive timeout', () => {

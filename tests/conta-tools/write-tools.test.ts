@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { buildHarness, WRITE_TOOL_NAMES } from '../helpers/tool-harness.js';
+import {
+  buildHarness,
+  resultJson,
+  WRITE_TOOL_NAMES,
+  type ToolHarness,
+} from '../helpers/tool-harness.js';
 
 /**
  * Coverage for the write tools. The two things that must never regress:
@@ -20,6 +25,15 @@ const CUSTOMER = {
   customerAddressPostcode: '0155',
   customerAddressCity: 'Oslo',
 };
+
+/** Enough responses for a tool that reads before it writes (update_customer). */
+const TWO_OK = [
+  { status: 200, body: {} },
+  { status: 200, body: {} },
+];
+
+/** The write is always the last request a tool makes. */
+const lastCall = (h: ToolHarness) => h.calls[h.calls.length - 1];
 
 /** Every write tool, with a minimal valid argument set. */
 const WRITE_TOOLS: [string, Record<string, unknown>][] = [
@@ -75,28 +89,28 @@ describe('dryRun header plumbing', () => {
   it.each(WRITE_TOOLS)(
     '%s sends conta-force-rollback when dryRun is true',
     async (name, args) => {
-      const harness = buildHarness({ orgId: ORG });
+      const harness = buildHarness({ orgId: ORG, responses: TWO_OK });
 
       await harness.call(name, { ...args, dryRun: true });
 
-      expect(harness.soleCall().headers['conta-force-rollback']).toBe('true');
+      expect(lastCall(harness).headers['conta-force-rollback']).toBe('true');
     },
   );
 
   it.each(WRITE_TOOLS)('%s omits the header when dryRun is absent', async (name, args) => {
-    const harness = buildHarness({ orgId: ORG });
+    const harness = buildHarness({ orgId: ORG, responses: TWO_OK });
 
     await harness.call(name, args);
 
-    expect(harness.soleCall().headers['conta-force-rollback']).toBeUndefined();
+    expect(lastCall(harness).headers['conta-force-rollback']).toBeUndefined();
   });
 
   it.each(WRITE_TOOLS)('%s omits the header when dryRun is false', async (name, args) => {
-    const harness = buildHarness({ orgId: ORG });
+    const harness = buildHarness({ orgId: ORG, responses: TWO_OK });
 
     await harness.call(name, { ...args, dryRun: false });
 
-    expect(harness.soleCall().headers['conta-force-rollback']).toBeUndefined();
+    expect(lastCall(harness).headers['conta-force-rollback']).toBeUndefined();
   });
 
   it('never leaks dryRun into the query string or the request body', async () => {
@@ -126,15 +140,53 @@ describe('customer write tools', () => {
     expect(JSON.parse(call.body!)).toEqual({ ...CUSTOMER, orgNo: '999888777' });
   });
 
-  it('update_customer PUTs to the id path and keeps id out of the body', async () => {
-    const harness = buildHarness({ orgId: ORG });
+  it('update_customer reads the customer, keeps every field and overlays only the change', async () => {
+    const current = {
+      id: 5,
+      ...CUSTOMER,
+      deliveryAddressLine1: 'Lagerveien 2',
+      efakturaEmailAddress: 'efaktura@example.no',
+      vismaNo: 'V-77',
+      phoneNo: null,
+      createdAt: '2026-01-01',
+      contacts: [{ id: 3, customerId: 5, name: 'Kari', createdAt: '2026-01-01' }],
+    };
+    const harness = buildHarness({
+      orgId: ORG,
+      responses: [
+        { status: 200, body: current },
+        { status: 200, body: {} },
+      ],
+    });
 
-    await harness.call('update_customer', { id: 5, ...CUSTOMER });
+    await harness.call('update_customer', { id: 5, emailAddress: 'ny@example.no' });
 
-    const call = harness.soleCall();
-    expect(call.method).toBe('PUT');
-    expect(new URL(call.url).pathname).toBe(`/invoice/organizations/${ORG}/customers/5`);
-    expect(JSON.parse(call.body!)).not.toHaveProperty('id');
+    const [read, write] = harness.calls;
+    expect(read.method).toBe('GET');
+    expect(new URL(read.url).pathname).toBe(`/invoice/organizations/${ORG}/customers/5`);
+    expect(write.method).toBe('PUT');
+    expect(new URL(write.url).pathname).toBe(`/invoice/organizations/${ORG}/customers/5`);
+    expect(JSON.parse(write.body!)).toEqual({
+      ...CUSTOMER,
+      deliveryAddressLine1: 'Lagerveien 2',
+      efakturaEmailAddress: 'efaktura@example.no',
+      vismaNo: 'V-77',
+      emailAddress: 'ny@example.no',
+      contacts: [{ id: 3, customerId: 5, name: 'Kari' }],
+    });
+  });
+
+  it('update_customer does not PUT when the current customer cannot be read', async () => {
+    const harness = buildHarness({
+      orgId: ORG,
+      responses: [{ status: 404, body: { error: 'not found' } }],
+    });
+
+    const result = await harness.call('update_customer', { id: 5, name: 'Nytt navn' });
+
+    expect(result.isError).toBe(true);
+    expect(harness.calls).toHaveLength(1);
+    expect(harness.calls[0].method).toBe('GET');
   });
 });
 
@@ -244,6 +296,105 @@ describe('invoice write tools', () => {
       creditNoteDate: '2026-07-30',
       removePaymentsIfExist: true,
     });
+  });
+});
+
+describe('credit note payment removal', () => {
+  it('refuses removePaymentsIfExist without allowDelete and sends nothing', async () => {
+    const harness = buildHarness({ orgId: ORG, policy: {} });
+
+    const result = await harness.call('create_credit_note', { id: 9, removePaymentsIfExist: true });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/CONTA_ALLOW_DELETE/);
+    expect(harness.calls).toHaveLength(0);
+  });
+
+  it('still credits without removing payments when deletes are off', async () => {
+    const harness = buildHarness({ orgId: ORG, policy: {} });
+
+    const result = await harness.call('create_credit_note', { id: 9 });
+
+    expect(result.isError).toBeUndefined();
+    expect(harness.soleCall().method).toBe('POST');
+  });
+});
+
+describe('create_invoice from a draft', () => {
+  const DRAFT = { status: 200, body: { id: 21, customerId: 7 } };
+  const INVOICE = { status: 200, body: { id: 100, invoiceNo: 1042 } };
+
+  it('checks the draft, creates the invoice, then deletes the draft', async () => {
+    const harness = buildHarness({
+      orgId: ORG,
+      responses: [DRAFT, INVOICE, { status: 200, body: {} }],
+    });
+
+    const result = await harness.call('create_invoice', {
+      customerId: 7,
+      invoiceLines: [LINE],
+      invoiceDraftId: 21,
+    });
+
+    expect(harness.calls.map((c) => [c.method, new URL(c.url).pathname])).toEqual([
+      ['GET', `/invoice/organizations/${ORG}/invoice-drafts/21`],
+      ['POST', `/invoice/organizations/${ORG}/invoices`],
+      ['DELETE', `/invoice/organizations/${ORG}/invoice-drafts/21`],
+    ]);
+    expect(JSON.parse(harness.calls[1].body!)).not.toHaveProperty('invoiceDraftId');
+    expect(resultJson(result)).toEqual({
+      note: 'Kladd 21 er slettet.',
+      contaResponse: { id: 100, invoiceNo: 1042 },
+    });
+  });
+
+  it('refuses a draft for another customer before creating anything', async () => {
+    const harness = buildHarness({
+      orgId: ORG,
+      responses: [{ status: 200, body: { id: 21, customerId: 8 } }],
+    });
+
+    const result = await harness.call('create_invoice', {
+      customerId: 7,
+      invoiceLines: [LINE],
+      invoiceDraftId: 21,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/Ingen faktura er opprettet/);
+    expect(harness.calls).toHaveLength(1);
+  });
+
+  it('reports success, not an error, when only the draft cleanup fails', async () => {
+    const harness = buildHarness({
+      orgId: ORG,
+      responses: [DRAFT, INVOICE, { status: 500, body: { error: 'boom' } }],
+    });
+
+    const result = await harness.call('create_invoice', {
+      customerId: 7,
+      invoiceLines: [LINE],
+      invoiceDraftId: 21,
+    });
+
+    expect(result.isError).toBeUndefined();
+    const json = resultJson(result) as { note: string; contaResponse: unknown };
+    expect(json.note).toMatch(/Fakturaen ER opprettet/);
+    expect(json.contaResponse).toEqual({ id: 100, invoiceNo: 1042 });
+  });
+
+  it('leaves the draft alone on a dry run', async () => {
+    const harness = buildHarness({ orgId: ORG, responses: [DRAFT, INVOICE] });
+
+    const result = await harness.call('create_invoice', {
+      customerId: 7,
+      invoiceLines: [LINE],
+      invoiceDraftId: 21,
+      dryRun: true,
+    });
+
+    expect(harness.calls.map((c) => c.method)).toEqual(['GET', 'POST']);
+    expect((resultJson(result) as { note: string }).note).toMatch(/ikke slettet/);
   });
 });
 

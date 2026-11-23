@@ -30,6 +30,8 @@ const transport = new StdioClientTransport({
   env: {
     PATH: process.env.PATH,
     CONTA_API_KEY: process.env.CONTA_API_KEY,
+    // Serveren er skrivebeskyttet som standard. dryRun-testene trenger skrive-verktøyene.
+    CONTA_READ_ONLY: 'false',
     ...(process.env.CONTA_ORG_ID ? { CONTA_ORG_ID: process.env.CONTA_ORG_ID } : {}),
     ...(process.env.CONTA_BASE_URL ? { CONTA_BASE_URL: process.env.CONTA_BASE_URL } : {}),
   },

@@ -33,14 +33,14 @@
         },
         {
           "name": "CONTA_READ_ONLY",
-          "description": "true = bare lese-verktøy.",
+          "description": "Default true = bare lese-verktøy. false slår på skrive-verktøyene.",
           "isRequired": false,
           "isSecret": false,
           "format": "string"
         },
         {
           "name": "CONTA_ALLOW_DELETE",
-          "description": "true = registrer delete_payment.",
+          "description": "true = registrer delete_payment og tillat removePaymentsIfExist på kreditnota.",
           "isRequired": false,
           "isSecret": false,
           "format": "string"

@@ -12,8 +12,10 @@ OpenAI Codex. The full documentation is in Norwegian: [README.md](README.md).
 ## Security first
 
 - The API key has the same access as the Conta user who created it.
-- Start with `CONTA_READ_ONLY=true`: only read tools are registered.
-- Deletion is off by default. `delete_payment` only exists with `CONTA_ALLOW_DELETE=true`.
+- Read-only by default: only read tools are registered. Enable writes with
+  `CONTA_READ_ONLY=false`. Unrecognised values (such as `on`) stop the server.
+- Deletion is off by default. `delete_payment`, and `removePaymentsIfExist` on
+  `create_credit_note`, only work with `CONTA_ALLOW_DELETE=true`.
 - `create_invoice` creates a real, legally binding invoice. Use `dryRun: true` first.
   On a dry run, delivery recipients are never sent, so nothing can reach a customer.
 - Tools carry MCP annotations (`readOnlyHint`, `destructiveHint`) so clients can ask
@@ -47,8 +49,8 @@ Create an API key in Conta under **User → Data & Access → Create new API key
 |---|---|---|
 | `CONTA_API_KEY` | yes | API key, sent as the `apiKey` header. |
 | `CONTA_ORG_ID` | no | Default organization. Find it with `list_organizations`. |
-| `CONTA_READ_ONLY` | no | `true` = read tools only. |
-| `CONTA_ALLOW_DELETE` | no | `true` = register `delete_payment`. |
+| `CONTA_READ_ONLY` | no | Default `true` = read tools only. `false` enables write tools. |
+| `CONTA_ALLOW_DELETE` | no | `true` = register `delete_payment` and allow `removePaymentsIfExist`. |
 | `CONTA_BASE_URL` | no | Default `https://api.gateway.conta.no`. Must be `https://`. |
 | `CONTA_LANGUAGE` | no | `NO` (default) or `EN`. |
 | `CONTA_TIMEOUT_MS` | no | Per-request timeout, default `30000`. |

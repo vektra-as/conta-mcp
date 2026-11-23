@@ -27,6 +27,8 @@ const transport = new StdioClientTransport({
   env: {
     PATH: process.env.PATH,
     CONTA_API_KEY: process.env.CONTA_API_KEY,
+    // Serveren er skrivebeskyttet som standard. dryRun-testene trenger skrive-verktøyene.
+    CONTA_READ_ONLY: 'false',
     ...(process.env.CONTA_ORG_ID ? { CONTA_ORG_ID: process.env.CONTA_ORG_ID } : {}),
     ...(process.env.CONTA_BASE_URL ? { CONTA_BASE_URL: process.env.CONTA_BASE_URL } : {}),
   },
@@ -65,7 +67,7 @@ const results = [];
 // ─────────────────────────────────────────────────────────────
 // 1. update_customer
 // ─────────────────────────────────────────────────────────────
-console.log('1. update_customer (dryRun) — full PUT-erstatning\n');
+console.log('1. update_customer (dryRun), henter og fletter før PUT\n');
 
 const { payload: custList } = await callTool('search_customers', { hits: 1 });
 const customerId = custList?.hits?.[0]?.id;
@@ -76,31 +78,15 @@ if (customerId === undefined) {
   const { payload: original } = await callTool('get_customer', { id: customerId });
   console.log(`  Kunde ${customerId}: "${original.name}"`);
 
-  /** Map en kunderad tilbake til update_customer-argumenter. */
-  const toArgs = (c, overrides = {}) => ({
-    id: customerId,
-    name: c.name,
-    customerType: c.customerType,
-    customerAddressLine1: c.customerAddressLine1,
-    customerAddressPostcode: c.customerAddressPostcode,
-    customerAddressCity: c.customerAddressCity,
-    ...(c.orgNo ? { orgNo: c.orgNo } : {}),
-    ...(c.phoneNo ? { phoneNo: c.phoneNo } : {}),
-    ...(c.emailAddress ? { emailAddress: c.emailAddress } : {}),
-    ...(c.daysUntilPaymentReminder !== undefined
-      ? { daysUntilPaymentReminder: c.daysUntilPaymentReminder }
-      : {}),
-    ...(c.invoiceDeliveryMethod ? { invoiceDeliveryMethod: c.invoiceDeliveryMethod } : {}),
-    ...(c.isActive !== undefined ? { isActive: c.isActive } : {}),
-    ...overrides,
-  });
+  // update_customer fletter inn bare feltene som sendes, så navnet holder.
+  const toArgs = (overrides = {}) => ({ id: customerId, ...overrides });
 
   // Endre navnet slik at rollback faktisk har noe å rulle tilbake. Uten en
   // reell endring beviser testen ingenting.
   const marker = `${original.name} [DRYRUN]`;
   const { isError, text } = await callTool(
     'update_customer',
-    toArgs(original, { name: marker, dryRun: true }),
+    toArgs({ name: marker, dryRun: true }),
   );
 
   if (isError) {
@@ -117,7 +103,7 @@ if (customerId === undefined) {
 
     if (!unchanged) {
       console.log('  ⚠ rollback virket ikke — gjenoppretter originalen...');
-      const restore = await callTool('update_customer', toArgs(original));
+      const restore = await callTool('update_customer', toArgs({ name: original.name }));
       const { payload: restored } = await callTool('get_customer', { id: customerId });
       console.log(
         restore.isError || restored.name !== original.name

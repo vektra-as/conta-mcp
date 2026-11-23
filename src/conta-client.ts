@@ -274,8 +274,13 @@ export class ContaClient {
         res = await buildRequest();
       } catch (e) {
         if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
+          const base = `Conta ${method} ${path} timed out after ${this.timeoutMs} ms (set CONTA_TIMEOUT_MS to change).`;
+          // A write that timed out may still have been carried out by Conta.
+          // Retrying blindly can create a second invoice or payment.
           throw new Error(
-            `Conta ${method} ${path} timed out after ${this.timeoutMs} ms (set CONTA_TIMEOUT_MS to change)`
+            method === "GET"
+              ? base
+              : `${base} The request may still have been carried out by Conta. Do NOT retry until you have checked whether it was saved (for example with search_invoices, search_invoice_drafts, get_invoice_payments or search_customers).`
           );
         }
         throw e;

@@ -25,8 +25,14 @@ Bare siste publiserte versjon får sikkerhetsrettinger.
 - API-nøkkelen logges aldri og tas aldri med i feilmeldinger.
 - `CONTA_BASE_URL` må være `https://` (http er bare lov mot localhost), så nøkkelen ikke
   sendes ukryptert.
-- `CONTA_READ_ONLY=true` fjerner alle skrive-verktøy.
-- `delete_payment` er av med mindre `CONTA_ALLOW_DELETE=true`.
+- Serveren er skrivebeskyttet som standard. Skrive-verktøy krever `CONTA_READ_ONLY=false`,
+  og ukjente verdier stopper serveren.
+- `delete_payment` og `removePaymentsIfExist` på kreditnota er av med mindre
+  `CONTA_ALLOW_DELETE=true`.
+- `update_customer` henter kunden og fletter inn endringene, så felt verktøyet ikke kjenner
+  ikke blir tømt.
+- Tidsavbrudd på skrivekall sier fra at kallet kan ha gått gjennom, så modellen sjekker før
+  den prøver på nytt.
 - `dryRun` sender aldri leveringsmottakere, så en test kan ikke nå en kunde.
 - Alle verktøy har MCP-annotasjoner, så klienten kan be om bekreftelse på skrivekall.
 - Requests har timeout, og store svar avkortes.

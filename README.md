@@ -22,10 +22,13 @@ Denne serveren gir en AI-assistent tilgang til regnskapet ditt. Les dette først
 
 - **API-nøkkelen har samme tilgang som brukeren som lagde den.** Lag gjerne en egen
   Conta-bruker med begrenset tilgang til AI-bruk.
-- **Start med `CONTA_READ_ONLY=true`.** Da registreres bare lese-verktøy, og assistenten kan
-  ikke lage fakturaer, registrere betalinger eller endre kunder.
+- **Serveren er skrivebeskyttet som standard.** Bare lese-verktøy registreres, og
+  assistenten kan ikke lage fakturaer, registrere betalinger eller endre kunder. Skriving
+  slås på med `CONTA_READ_ONLY=false`. Ukjente verdier (for eksempel `on`) stopper serveren
+  i stedet for å velge modus.
 - **Sletting er av som standard.** `delete_payment` finnes bare når
-  `CONTA_ALLOW_DELETE=true` er satt.
+  `CONTA_ALLOW_DELETE=true` er satt. Det samme gjelder `create_credit_note` med
+  `removePaymentsIfExist: true`, som fjerner betalinger.
 - **`create_invoice` lager en ekte, juridisk bindende faktura** med fakturanummer. Be
   assistenten bruke `dryRun: true` først, og godkjenn hvert skrivekall i klienten din.
   Verktøyene er merket med MCP-annotasjoner (`readOnlyHint`, `destructiveHint`), så
@@ -75,8 +78,8 @@ npm run build
 |---|---|---|
 | `CONTA_API_KEY` | ja | API-nøkkel. Sendes som `apiKey`-header på hver request. |
 | `CONTA_ORG_ID` | nei | Default organisasjon. Uten denne må hvert verktøykall oppgi `opContextOrgId`. |
-| `CONTA_READ_ONLY` | nei | `true` = bare lese-verktøy. Anbefalt for de fleste. |
-| `CONTA_ALLOW_DELETE` | nei | `true` = registrer `delete_payment`. Av som standard. |
+| `CONTA_READ_ONLY` | nei | Default `true` = bare lese-verktøy. `false` slår på skrive-verktøyene. |
+| `CONTA_ALLOW_DELETE` | nei | `true` = registrer `delete_payment` og tillat `removePaymentsIfExist` på kreditnota. Av som standard. |
 | `CONTA_BASE_URL` | nei | Override av base-URL. Default `https://api.gateway.conta.no`. Må være `https://`. |
 | `CONTA_LANGUAGE` | nei | `NO` (default) eller `EN`. Settes som `conta-language`-header. |
 | `CONTA_TIMEOUT_MS` | nei | Timeout per request. Default `30000`. |
@@ -175,8 +178,15 @@ npm run smoke:write
 `profit_and_loss_report`, `balance_report`, `trial_balance`, `open_accounts_receivable`,
 `income_expenses_key_figures`
 
-Med `CONTA_READ_ONLY=true` registreres bare verktøyene som leser (`ping`, `list_*`, `get_*`,
-`search_*` og rapportene).
+Som standard (`CONTA_READ_ONLY` utelatt eller `true`) registreres bare verktøyene som leser
+(`ping`, `list_*`, `get_*`, `search_*` og rapportene). Skrive-verktøyene krever
+`CONTA_READ_ONLY=false`.
+
+`update_customer` tar bare feltene som skal endres. Serveren henter kunden først og beholder
+resten, fordi Contas PUT erstatter hele kunden.
+
+`create_invoice` tar `invoiceDraftId` når fakturaen er laget fra en kladd. Kladden sjekkes mot
+kunden før fakturaen opprettes, og slettes etterpå.
 
 ## Arbeidsflyter (skills)
 

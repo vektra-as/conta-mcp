@@ -60,8 +60,12 @@ Bruk \`dryRun: true\` først hvis noe er usikkert.
 
 **Avvik du må håndtere, ikke skjule:**
 - Beløp < \`sumRemaining\` → delbetaling. Fakturaen forblir ubetalt. Si det.
-- Beløp > \`sumRemaining\` → overbetaling. Spør brukeren før du registrerer.
-- Negativt beløp → tilbakebetaling til kunden.
+- Beløp > \`sumRemaining\` → overbetaling. Conta avviser beløp over
+  \`sumRemaining\`. Ikke registrer noe før du har spurt brukeren hvordan
+  overskuddet skal håndteres.
+- Tilbakebetaling eller returnert betaling registreres med
+  \`returnPaymentDate\`, aldri som negativt beløp. Verktøyet avviser beløp
+  under 0.01.
 
 ### Steg 4 — Verifiser
 

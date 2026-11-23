@@ -92,6 +92,13 @@ Kjør gjerne \`create_invoice\` med \`dryRun: true\` først for å validere.
 Bekreft så med brukeren, og kjør uten \`dryRun\`.
 
 Påkrevd: \`customerId\` og minst én linje i \`invoiceLines\`.
+
+Send med \`invoiceDraftId\` = id-en til kladden fra steg 3. Da sletter
+serveren kladden når fakturaen er opprettet, så den ikke blir liggende og
+faktureres på nytt senere. Kladden må gjelde samme kunde.
+
+Får du tidsavbrudd eller usikker feil: ikke kjør \`create_invoice\` på nytt før
+du har sjekket med \`search_invoices\` at fakturaen ikke allerede finnes.
 Bruk \`invoiceRecipients\` for å styre levering, f.eks.:
 \`[{ "type": "EMAIL", "emailAddress": "kunde@example.no" }]\`
 

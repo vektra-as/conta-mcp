@@ -53,10 +53,14 @@ noe mer.
 
 \`get_invoice_payments\` med fakturaens id.
 
-Hvis det finnes registrerte betalinger må du spørre brukeren hva som skal
-skje med dem, og sette \`removePaymentsIfExist\` deretter:
-- \`true\` — fjern betalingene (velges når betalingen faktisk skal reverseres)
-- \`false\`/utelatt — behold betalingene
+Ifølge Conta kan en faktura som er delbetalt ikke krediteres i sin helhet
+mens betalingene står. Hvis det finnes registrerte betalinger må du spørre
+brukeren hva som skal skje med dem:
+- Fjerne dem: \`removePaymentsIfExist: true\`. Det kan ikke angres og krever
+  at serveren kjører med \`CONTA_ALLOW_DELETE=true\`. Uten det avviser
+  verktøyet kallet, og brukeren må fjerne betalingene i Conta selv.
+- Beholde dem: utelat \`removePaymentsIfExist\`. Er fakturaen delbetalt, vil
+  Conta da sannsynligvis avvise kreditnotaen.
 
 Ikke velg dette selv. Det påvirker regnskapet.
 
@@ -66,7 +70,9 @@ Kjør \`create_credit_note\` med \`dryRun: true\` først.
 
 Be så brukeren bekrefte eksplisitt, og kjør uten \`dryRun\`:
 - \`id\` — fakturaen som skal krediteres
-- \`creditNoteDate\` — YYYY-MM-DD, default i dag
+- \`creditNoteDate\` — YYYY-MM-DD. Utelatt bruker Conta datoen til den
+  opprinnelige fakturaen, ikke dagens dato. Spør brukeren hvilken dato som
+  skal gjelde
 - \`removePaymentsIfExist\` — fra steg 2
 - \`invoiceRecipients\` — hvis kreditnotaen skal sendes til kunden
 

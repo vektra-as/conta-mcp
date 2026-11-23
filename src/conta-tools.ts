@@ -24,6 +24,7 @@ import {
   buildPaymentBody,
   buildProductBody,
   buildProjectBody,
+  mergeCustomerUpdate,
   INVOICE_VAT_CODES,
   PRODUCT_VAT_CODES,
   type InvoiceVatCode,
@@ -104,19 +105,43 @@ function params(obj: QueryParams): QueryParams {
 
 /** Which tools get registered, and how large a result may be. */
 export interface ToolPolicy {
-  /** Register only tools that cannot change data. Default false. */
+  /**
+   * Register only tools that cannot change data. Unset here means false, so
+   * programmatic callers opt in explicitly; the env reader defaults to true.
+   */
   readOnly?: boolean;
-  /** Register delete_payment (irreversible). Default false. */
+  /**
+   * Allow irreversible removals: register delete_payment, and let
+   * create_credit_note remove payments (removePaymentsIfExist). Default false.
+   */
   allowDelete?: boolean;
   /** Cap on one tool result, in characters. Default DEFAULT_MAX_RESPONSE_CHARS. */
   maxResponseChars?: number;
 }
 
-function envFlag(value: string | undefined): boolean {
-  return value !== undefined && ["1", "true", "yes", "ja"].includes(value.trim().toLowerCase());
+const TRUE_VALUES = ["1", "true", "yes", "ja"];
+const FALSE_VALUES = ["0", "false", "no", "nei"];
+
+/**
+ * Parse a boolean env flag. Unset or empty gives the default; anything that is
+ * not a recognised yes/no is refused, so a typo such as "on" or "treu" stops
+ * the server instead of silently choosing a mode.
+ */
+function envFlag(name: string, value: string | undefined, defaultValue: boolean): boolean {
+  if (value === undefined || value.trim() === "") return defaultValue;
+  const v = value.trim().toLowerCase();
+  if (TRUE_VALUES.includes(v)) return true;
+  if (FALSE_VALUES.includes(v)) return false;
+  throw new Error(
+    `${name} must be one of ${[...TRUE_VALUES, ...FALSE_VALUES].join(", ")}, got "${value}"`,
+  );
 }
 
-/** Read CONTA_READ_ONLY, CONTA_ALLOW_DELETE and CONTA_MAX_RESPONSE_CHARS. */
+/**
+ * Read CONTA_READ_ONLY, CONTA_ALLOW_DELETE and CONTA_MAX_RESPONSE_CHARS.
+ * Read-only is the default: write tools are only registered with an explicit
+ * CONTA_READ_ONLY=false.
+ */
 export function toolPolicyFromEnv(env: NodeJS.ProcessEnv = process.env): ToolPolicy {
   const rawMax = env.CONTA_MAX_RESPONSE_CHARS;
   let maxResponseChars: number | undefined;
@@ -128,8 +153,8 @@ export function toolPolicyFromEnv(env: NodeJS.ProcessEnv = process.env): ToolPol
     maxResponseChars = parsed;
   }
   return {
-    readOnly: envFlag(env.CONTA_READ_ONLY),
-    allowDelete: envFlag(env.CONTA_ALLOW_DELETE),
+    readOnly: envFlag("CONTA_READ_ONLY", env.CONTA_READ_ONLY, true),
+    allowDelete: envFlag("CONTA_ALLOW_DELETE", env.CONTA_ALLOW_DELETE, false),
     maxResponseChars,
   };
 }
@@ -140,7 +165,8 @@ const WRITE_TOOLS: Record<string, ToolAnnotations> = {
   update_customer: { destructiveHint: true, idempotentHint: true },
   create_invoice_draft: { destructiveHint: false, idempotentHint: false },
   create_invoice: { destructiveHint: false, idempotentHint: false },
-  create_credit_note: { destructiveHint: false, idempotentHint: false },
+  // Can remove registered payments (removePaymentsIfExist).
+  create_credit_note: { destructiveHint: true, idempotentHint: false },
   register_invoice_payment: { destructiveHint: false, idempotentHint: false },
   delete_payment: { destructiveHint: true, idempotentHint: true },
   create_product: { destructiveHint: false, idempotentHint: false },
@@ -755,22 +781,20 @@ export function registerAllTools(
 
   tool(
     "update_customer",
-    "Oppdater en eksisterende kunde. Merk at dette er en full erstatning (PUT) — send med alle feltene som skal beholdes, ikke bare de som endres. Hent gjeldende verdier med get_customer først.",
+    "Oppdater en eksisterende kunde. Send bare feltene som skal endres: serveren henter kunden fra Conta og beholder alle andre felt (også adresser og felt dette verktøyet ikke har). contacts erstatter hele kontaktlisten hvis den oppgis.",
     {
       ...orgSchema,
       ...dryRunSchema,
       id: z.number().int().describe("Kunde-id."),
-      ...customerFieldsSchema,
+      ...z.object(customerFieldsSchema).partial().shape,
     },
     async ({ opContextOrgId, dryRun, id, ...fields }) =>
-      run(() =>
-        client.put(
-          orgPath(opContextOrgId, `/customers/${id}`),
-          buildCustomerBody(fields),
-          undefined,
-          { dryRun },
-        ),
-      ),
+      run(async () => {
+        const path = orgPath(opContextOrgId, `/customers/${id}`);
+        // Conta's PUT replaces the whole customer, so read it first and merge.
+        const current = await client.get(path);
+        return client.put(path, mergeCustomerUpdate(current, fields), undefined, { dryRun });
+      }),
   );
 
   // ==================== FAKTURA (skriv) ====================
@@ -843,9 +867,31 @@ export function registerAllTools(
       showDiscount: z.boolean().optional().describe("Vis rabattkolonne på PDF-en."),
       deliveryDate: z.string().optional().describe("YYYY-MM-DD."),
       ehfOrderReference: z.string().optional().describe("Ordrenummer, påkrevd for EHF."),
+      invoiceDraftId: z
+        .number()
+        .int()
+        .optional()
+        .describe(
+          "Id til kladden fakturaen er laget fra. Kladden slettes når fakturaen er opprettet, så den ikke blir liggende og kan faktureres på nytt. Må gjelde samme kunde.",
+        ),
     },
-    async ({ opContextOrgId, dryRun, ...input }) =>
+    async ({ opContextOrgId, dryRun, invoiceDraftId, ...input }) =>
       run(async () => {
+        const draftPath =
+          invoiceDraftId === undefined
+            ? undefined
+            : orgPath(opContextOrgId, `/invoice-drafts/${invoiceDraftId}`);
+        // Check the draft before the invoice exists, so a wrong id fails
+        // without leaving anything behind and never deletes another customer's draft.
+        if (draftPath) {
+          const draft = (await client.get(draftPath)) as { customerId?: unknown } | null;
+          if (draft?.customerId !== input.customerId) {
+            throw new Error(
+              `Kladd ${invoiceDraftId} gjelder ikke kunde ${input.customerId}. Ingen faktura er opprettet. Sjekk kladden med get_invoice_draft.`,
+            );
+          }
+        }
+
         const { fields, stripped } = stripRecipientsOnDryRun(dryRun, input);
         const data = await client.post(
           orgPath(opContextOrgId, "/invoices"),
@@ -853,22 +899,47 @@ export function registerAllTools(
           undefined,
           { dryRun },
         );
-        return stripped ? { note: DRY_RUN_RECIPIENTS_NOTE, contaResponse: data } : data;
+
+        const notes: string[] = [];
+        if (stripped) notes.push(DRY_RUN_RECIPIENTS_NOTE);
+        if (draftPath && dryRun) {
+          notes.push(`dryRun: kladd ${invoiceDraftId} er ikke slettet.`);
+        } else if (draftPath) {
+          // The invoice now exists. A failed cleanup must not read as a failed
+          // call, or the model may retry and create a second invoice.
+          try {
+            await client.delete(draftPath);
+            notes.push(`Kladd ${invoiceDraftId} er slettet.`);
+          } catch (e) {
+            const why = e instanceof ContaApiError ? `${e.status} ${e.bodyText}` : String(e);
+            notes.push(
+              `Fakturaen ER opprettet, men kladd ${invoiceDraftId} ble ikke slettet (${why}). Ikke opprett fakturaen på nytt. Be brukeren slette kladden i Conta.`,
+            );
+          }
+        }
+        return notes.length > 0 ? { note: notes.join(" "), contaResponse: data } : data;
       }),
   );
 
   tool(
     "create_credit_note",
-    "Krediter en faktura i sin helhet. Dette oppretter en kreditnota som nuller ut fakturaen — den originale fakturaen slettes ikke. Bekreft med brukeren før du kjører uten dryRun.",
+    "Krediter en faktura i sin helhet. Dette oppretter en kreditnota som nuller ut fakturaen. Den originale fakturaen slettes ikke. Ifølge Conta kan en delbetalt faktura ikke krediteres i sin helhet uten at betalingene fjernes. Bekreft med brukeren før du kjører uten dryRun.",
     {
       ...orgSchema,
       ...dryRunSchema,
       id: z.number().int().describe("Id til fakturaen som skal krediteres."),
-      creditNoteDate: z.string().optional().describe("YYYY-MM-DD. Default i dag."),
+      creditNoteDate: z
+        .string()
+        .optional()
+        .describe(
+          "YYYY-MM-DD. Utelatt bruker Conta datoen til den opprinnelige fakturaen, ikke dagens dato.",
+        ),
       removePaymentsIfExist: z
         .boolean()
         .optional()
-        .describe("true = fjern registrerte betalinger på fakturaen."),
+        .describe(
+          "true = fjern registrerte betalinger på fakturaen. Kan ikke angres, og krever CONTA_ALLOW_DELETE=true.",
+        ),
       invoiceRecipients: z
         .array(invoiceRecipientSchema)
         .optional()
@@ -876,6 +947,13 @@ export function registerAllTools(
     },
     async ({ opContextOrgId, dryRun, id, ...input }) =>
       run(async () => {
+        // Removing payments is as irreversible as delete_payment, so it sits
+        // behind the same switch.
+        if (input.removePaymentsIfExist && !policy.allowDelete) {
+          throw new Error(
+            "removePaymentsIfExist=true fjerner betalinger og krever CONTA_ALLOW_DELETE=true. Ingenting er sendt til Conta. Be brukeren fjerne betalingene i Conta, eller slå på CONTA_ALLOW_DELETE.",
+          );
+        }
         const { fields, stripped } = stripRecipientsOnDryRun(dryRun, input);
         const data = await client.post(
           orgPath(opContextOrgId, `/invoices/${id}/credit-note`),

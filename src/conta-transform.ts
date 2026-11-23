@@ -366,6 +366,88 @@ export function buildCustomerBody(
   });
 }
 
+/**
+ * Every field PUT /customers/{id} accepts (RouteV1CustomerModel in the spec).
+ * Broader than what create_customer exposes: an update must carry the fields
+ * the tool schema does not know about too, or the PUT would blank them.
+ */
+export const CUSTOMER_PUT_FIELDS = [
+  "name",
+  "customerType",
+  "customerAddressLine1",
+  "customerAddressLine2",
+  "customerAddressPostcode",
+  "customerAddressCity",
+  "customerAddressCountry",
+  "deliveryAddressLine1",
+  "deliveryAddressLine2",
+  "deliveryAddressPostcode",
+  "deliveryAddressCity",
+  "deliveryAddressCountry",
+  "mailingAddressLine1",
+  "mailingAddressLine2",
+  "mailingAddressPostcode",
+  "mailingAddressCity",
+  "mailingAddressCountry",
+  "orgNo",
+  "phoneNo",
+  "emailAddress",
+  "dateOfBirth",
+  "daysUntilEstimateOverdue",
+  "daysUntilPaymentReminder",
+  "defaultInvoiceDiscount",
+  "invoiceDeliveryMethod",
+  "ehfRecipientOrgNo",
+  "efakturaEmailAddress",
+  "efakturaName",
+  "efakturaPhoneNo",
+  "parentCompanyNameForNuf",
+  "vismaNo",
+  "isActive",
+  "contacts",
+] as const;
+
+/** Fields of one customer contact (RouteV1CustomerContactModel). */
+const CUSTOMER_CONTACT_FIELDS = ["id", "customerId", "name", "emailAddress", "phoneNo", "title"];
+
+function pick(obj: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of keys) {
+    const v = obj[k];
+    if (v !== undefined && v !== null) out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * Build the PUT /customers/{id} body for a partial update: start from the
+ * customer as Conta has it now, keep every field the PUT accepts, and overlay
+ * only the fields the caller sent. Existing contacts keep their id, so they
+ * are updated rather than recreated. A `contacts` array in the patch replaces
+ * the whole list.
+ */
+export function mergeCustomerUpdate(
+  current: unknown,
+  patch: Partial<BuildCustomerInput>
+): Record<string, unknown> {
+  if (current === null || typeof current !== "object" || Array.isArray(current)) {
+    throw new Error("Could not read the current customer from Conta, so nothing was updated");
+  }
+  const base = pick(current as Record<string, unknown>, CUSTOMER_PUT_FIELDS);
+  if (Array.isArray(base.contacts)) {
+    base.contacts = base.contacts.map((c) =>
+      c !== null && typeof c === "object"
+        ? pick(c as Record<string, unknown>, CUSTOMER_CONTACT_FIELDS)
+        : c
+    );
+  }
+  const changes = compact({
+    ...patch,
+    contacts: patch.contacts?.map((c) => compact({ ...c })),
+  });
+  return { ...base, ...changes };
+}
+
 export interface BuildProductInput {
   name: string;
   bookkeepingAccountNo: string;
