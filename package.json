@@ -1,0 +1,68 @@
+{
+  "name": "conta-mcp",
+  "version": "0.2.0",
+  "description": "Uoffisiell MCP-server for Conta (conta.no) sitt API for fakturering og regnskap",
+  "mcpName": "io.github.valstrand-vektra/conta-mcp",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "conta",
+    "regnskap",
+    "faktura",
+    "accounting",
+    "invoicing",
+    "norway",
+    "claude",
+    "ai"
+  ],
+  "homepage": "https://github.com/valstrand-vektra/mcp-conta#readme",
+  "bugs": {
+    "url": "https://github.com/valstrand-vektra/mcp-conta/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/valstrand-vektra/mcp-conta.git"
+  },
+  "license": "MIT",
+  "author": "Ørjan Valstrand",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "conta-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "README.en.md",
+    "SECURITY.md"
+  ],
+  "scripts": {
+    "build": "npm run clean && tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "smoke": "npm run build && node --env-file-if-exists=.env scripts/smoke.mjs",
+    "smoke:mcp": "npm run build && node --env-file-if-exists=.env scripts/smoke-mcp.mjs",
+    "smoke:write": "npm run build && node --env-file-if-exists=.env scripts/smoke-write-dryrun.mjs",
+    "smoke:write:mutating": "npm run build && node --env-file-if-exists=.env scripts/smoke-write-mutating.mjs",
+    "prepublishOnly": "npm run build && npm run typecheck && npm test",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@vitest/coverage-v8": "^5.1.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "manifest_version": "0.3",
+  "name": "conta-mcp",
+  "display_name": "Conta (uoffisiell)",
+  "version": "0.2.0",
+  "description": "Uoffisiell MCP-server for Contas API: fakturaer, kunder, betalinger og rapporter.",
+  "long_description": "Lar AI-assistenten lese og (valgfritt) skrive i Conta. Start med skrivebeskyttet modus. Ikke tilknyttet Conta AS.",
+  "author": {
+    "name": "Ørjan Valstrand",
+    "url": "https://github.com/valstrand-vektra"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/valstrand-vektra/mcp-conta.git"
+  },
+  "homepage": "https://github.com/valstrand-vektra/mcp-conta",
+  "license": "MIT",
+  "keywords": [
+    "conta",
+    "regnskap",
+    "faktura",
+    "accounting"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/dist/index.js"
+      ],
+      "env": {
+        "CONTA_API_KEY": "${user_config.api_key}",
+        "CONTA_ORG_ID": "${user_config.org_id}",
+        "CONTA_READ_ONLY": "${user_config.read_only}",
+        "CONTA_ALLOW_DELETE": "${user_config.allow_delete}"
+      }
+    }
+  },
+  "user_config": {
+    "api_key": {
+      "type": "string",
+      "title": "Conta API-nøkkel",
+      "description": "Lag den i Conta under Bruker → Data og tilgang → Opprett ny API-nøkkel.",
+      "sensitive": true,
+      "required": true
+    },
+    "org_id": {
+      "type": "string",
+      "title": "Organisasjons-id",
+      "description": "Valgfri default-organisasjon. Finn den med list_organizations.",
+      "required": false,
+      "default": ""
+    },
+    "read_only": {
+      "type": "boolean",
+      "title": "Skrivebeskyttet",
+      "description": "Bare lese-verktøy. Anbefalt.",
+      "required": false,
+      "default": true
+    },
+    "allow_delete": {
+      "type": "boolean",
+      "title": "Tillat sletting",
+      "description": "Registrer delete_payment. Sletting kan ikke angres.",
+      "required": false,
+      "default": false
+    }
+  },
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=22.0.0"
+    }
+  }
+}

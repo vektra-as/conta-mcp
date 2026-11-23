@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Lokal klone av cwvedvik/tripletex-mcp brukt som arkitektur-referanse.
+# Har sin egen .git og hører ikke hjemme i dette repoet.
+reference/
+
+# Bygde MCP-bundles (.mcpb)
+*.mcpb

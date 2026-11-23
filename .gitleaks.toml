@@ -1,0 +1,12 @@
+# gitleaks-oppsett. Standardreglene brukes, pluss en regel for Contas API-nøkler.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "conta-api-key"
+description = "Conta API-nøkkel i klartekst"
+regex = '''(?i)(conta_api_key|apiKey)["'\s:=]+["']?([A-Za-z0-9]{32})'''
+secretGroup = 2
+
+[allowlist]
+paths = ['''package-lock\.json''', '''docs/conta-external-api\.json''']

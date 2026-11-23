@@ -1,0 +1,65 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "io.github.valstrand-vektra/conta-mcp",
+  "title": "Conta (uoffisiell)",
+  "description": "Uoffisiell MCP-server for Contas API: fakturaer, kunder, betalinger og rapporter.",
+  "repository": {
+    "url": "https://github.com/valstrand-vektra/mcp-conta",
+    "source": "github"
+  },
+  "version": "0.2.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "conta-mcp",
+      "version": "0.2.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "CONTA_API_KEY",
+          "description": "API-nøkkel fra Conta (Bruker → Data og tilgang).",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "CONTA_ORG_ID",
+          "description": "Default organisasjons-id.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "CONTA_READ_ONLY",
+          "description": "true = bare lese-verktøy.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "CONTA_ALLOW_DELETE",
+          "description": "true = registrer delete_payment.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "CONTA_BASE_URL",
+          "description": "Override av base-URL (må være https).",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "CONTA_LANGUAGE",
+          "description": "NO eller EN.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}
