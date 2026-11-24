@@ -12,6 +12,7 @@ OpenAI Codex. The full documentation is in Norwegian: [README.md](README.md).
 ## Security first
 
 - The API key has the same access as the Conta user who created it.
+- Keep the key in `~/.config/conta-mcp/.env`, not in the chat or the client config.
 - Read-only by default: only read tools are registered. Enable writes with
   `CONTA_READ_ONLY=false`. Unrecognised values (such as `on`) stop the server.
 - Deletion is off by default. `delete_payment`, and `removePaymentsIfExist` on
@@ -26,24 +27,31 @@ Report vulnerabilities as described in [SECURITY.md](SECURITY.md).
 
 ## Quick start
 
-Create an API key in Conta under **User → Data & Access → Create new API key**
-([Conta's API guide](https://hjelp.conta.no/api)). Node 22 or newer is required.
+1. Create an API key in Conta: profile → **User → Data & Access → Create new API key**
+   ([Conta's API guide](https://hjelp.conta.no/api)).
+2. Ask your AI assistant (Claude Code, Codex, Cursor): "Set up Conta MCP from
+   https://github.com/vektra-as/conta-mcp". The instructions for the assistant are in
+   [README.md](README.md#instruks-til-ai-assistenten).
+3. Paste the key yourself into `~/.config/conta-mcp/.env` after `CONTA_API_KEY=` and restart
+   the client. Never paste the key into the chat.
+
+Node 22 or newer is required. The server is fetched and built from GitHub:
 
 ```json
 {
   "mcpServers": {
     "conta": {
       "command": "npx",
-      "args": ["-y", "conta-mcp"],
-      "env": {
-        "CONTA_API_KEY": "your-key",
-        "CONTA_ORG_ID": "123456",
-        "CONTA_READ_ONLY": "true"
-      }
+      "args": ["-y", "github:vektra-as/conta-mcp"]
     }
   }
 }
 ```
+
+Settings are read from the environment and from the key file `~/.config/conta-mcp/.env`
+(mode 600; the server warns if others can read it). Only `CONTA_*` variables are taken from
+the file, and values already set in the environment win. `CONTA_ENV_FILE` points to another
+file.
 
 | Variable | Required | Description |
 |---|---|---|

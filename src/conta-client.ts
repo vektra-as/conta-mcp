@@ -162,7 +162,7 @@ export class ContaClient {
   private static optionsFromEnv(): ContaClientOptions {
     const apiKey = process.env.CONTA_API_KEY;
     if (!apiKey) {
-      throw new Error("Missing CONTA_API_KEY env var");
+      throw new Error("Missing CONTA_API_KEY. Put it in ~/.config/conta-mcp/.env (or the file named by CONTA_ENV_FILE)");
     }
     const rawOrgId = process.env.CONTA_ORG_ID;
     let orgId: number | undefined;

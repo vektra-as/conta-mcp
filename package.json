@@ -2,7 +2,7 @@
   "name": "conta-mcp",
   "version": "0.2.0",
   "description": "Uoffisiell MCP-server for Conta (conta.no) sitt API for fakturering og regnskap",
-  "mcpName": "io.github.valstrand-vektra/conta-mcp",
+  "mcpName": "io.github.vektra-as/conta-mcp",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -15,13 +15,13 @@
     "claude",
     "ai"
   ],
-  "homepage": "https://github.com/valstrand-vektra/mcp-conta#readme",
+  "homepage": "https://github.com/vektra-as/conta-mcp#readme",
   "bugs": {
-    "url": "https://github.com/valstrand-vektra/mcp-conta/issues"
+    "url": "https://github.com/vektra-as/conta-mcp/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/valstrand-vektra/mcp-conta.git"
+    "url": "git+https://github.com/vektra-as/conta-mcp.git"
   },
   "license": "MIT",
   "author": "Ørjan Valstrand",
@@ -49,6 +49,7 @@
     "smoke:mcp": "npm run build && node --env-file-if-exists=.env scripts/smoke-mcp.mjs",
     "smoke:write": "npm run build && node --env-file-if-exists=.env scripts/smoke-write-dryrun.mjs",
     "smoke:write:mutating": "npm run build && node --env-file-if-exists=.env scripts/smoke-write-mutating.mjs",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build && npm run typecheck && npm test",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
   },

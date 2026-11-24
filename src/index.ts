@@ -8,9 +8,15 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { createRequire } from "node:module";
 import { ContaClient } from "./conta-client.js";
 import { registerAllTools, toolPolicyFromEnv } from "./conta-tools.js";
+import { loadContaEnvFile } from "./env-file.js";
 
 const require = createRequire(import.meta.url);
 const { version: MCP_VERSION } = require("../package.json") as { version: string };
+
+// Key file first, so ContaClient and the tool policy see its values. Logs names and paths, never values.
+const envFile = loadContaEnvFile();
+for (const warning of envFile.warnings) console.error(`Warning: ${warning}`);
+if (envFile.loaded) console.error(`Loaded ${envFile.applied.join(", ") || "no new settings"} from ${envFile.path}`);
 
 const client = new ContaClient();
 const server = new McpServer({

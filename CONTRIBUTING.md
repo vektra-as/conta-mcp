@@ -5,8 +5,8 @@ Takk for at du vil bidra! Issues og pull requests er velkomne, på norsk eller e
 ## Kom i gang
 
 ```bash
-git clone https://github.com/valstrand-vektra/mcp-conta.git
-cd mcp-conta
+git clone https://github.com/vektra-as/conta-mcp.git
+cd conta-mcp
 npm install
 npm run build && npm run typecheck && npm test
 ```

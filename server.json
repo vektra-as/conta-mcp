@@ -1,10 +1,10 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
-  "name": "io.github.valstrand-vektra/conta-mcp",
+  "name": "io.github.vektra-as/conta-mcp",
   "title": "Conta (uoffisiell)",
   "description": "Uoffisiell MCP-server for Contas API: fakturaer, kunder, betalinger og rapporter.",
   "repository": {
-    "url": "https://github.com/valstrand-vektra/mcp-conta",
+    "url": "https://github.com/vektra-as/conta-mcp",
     "source": "github"
   },
   "version": "0.2.0",

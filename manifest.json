@@ -11,9 +11,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/valstrand-vektra/mcp-conta.git"
+    "url": "https://github.com/vektra-as/conta-mcp.git"
   },
-  "homepage": "https://github.com/valstrand-vektra/mcp-conta",
+  "homepage": "https://github.com/vektra-as/conta-mcp",
   "license": "MIT",
   "keywords": [
     "conta",
